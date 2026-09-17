@@ -66,6 +66,7 @@ const STRINGS = {
     printTitle: "Today's sheet", printNow: "Print", printSub: "One page, every shop that owes.",
     excelTitle: "Excel", saveFile: "Save the file", excelSub: "Every outstanding shop, plain numbers for the accountant.",
     downloading: "Preparing the file…", downloaded: "Saved to your downloads.",
+    kbdPad: "You can type the amount and press Enter.", kbdPin: "You can type the PIN.",
 
     reminderTitle: "Reminder", reminderFor: "To", pickShop: "Which shop?",
     reminderMsg: (shop, amount, days) =>
@@ -124,6 +125,7 @@ const STRINGS = {
     printTitle: "இன்றைய பட்டியல்", printNow: "அச்சிடு", printSub: "ஒரு பக்கம், நிலுவை உள்ள அனைத்துக் கடைகளும்.",
     excelTitle: "Excel", saveFile: "கோப்பைச் சேமி", excelSub: "நிலுவை உள்ள அனைத்துக் கடைகளும், கணக்காளருக்கான எளிய எண்கள்.",
     downloading: "கோப்பு தயாராகிறது…", downloaded: "பதிவிறக்கத்தில் சேமிக்கப்பட்டது.",
+    kbdPad: "தொகையை டைப் செய்து Enter அழுத்தலாம்.", kbdPin: "PIN-ஐ டைப் செய்யலாம்.",
 
     reminderTitle: "நினைவூட்டல்", reminderFor: "யாருக்கு", pickShop: "எந்தக் கடை?",
     reminderMsg: (shop, amount, days) =>

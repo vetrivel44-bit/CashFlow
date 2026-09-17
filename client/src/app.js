@@ -15,7 +15,7 @@ import {
   outstandingList, groupByShop
 } from "../../shared/ledger.js";
 
-const screen = document.getElementById("screen");
+const screen = document.getElementById("page");
 const tabsEl = document.getElementById("tabs");
 const printarea = document.getElementById("printarea");
 
@@ -110,7 +110,8 @@ async function renderSignIn() {
     `<div class="keys">${keys}
        <button type="button" class="key back" data-pin="clear">✕</button>
        <button type="button" class="key pad-digit" data-pin="0">0</button>
-       <button type="button" class="key back" data-pin="del">${esc(S("del"))}</button></div>` +
+       <button type="button" class="key back" data-pin="del">${esc(S("del"))}</button></div>
+     <div class="kbdhint">${esc(S("kbdPin"))}</div>` +
     `</div>`;
 }
 
@@ -267,7 +268,7 @@ function renderOwner() {
   screen.innerHTML =
     `<div class="apphead"><span class="who"><span class="brand">${esc(S("brand"))}</span>
        <span class="date" style="display:block">${dmy(today())} · ${S("weekday")[d.getDay()]}</span></span>${langBar()}</div>
-     <div class="band">
+     <div class="band split">
        <div class="cell"><div class="owner-meta lab">${esc(S("collectedToday"))}</div>
          <div class="owner-total val paid">${rupees(collectedOn(data.entries, today()))}</div></div>
        <div class="cell"><div class="owner-meta lab">${esc(S("totalOutstanding"))}</div>
@@ -306,7 +307,8 @@ function renderStaff() {
          <button type="button" class="key quick" data-key="+500">+500</button>
          <button type="button" class="key pad-digit" data-key="0">0</button>
          <button type="button" class="key back" data-key="del">${esc(S("del"))}</button></div>
-       <button type="button" class="confirm" data-act="confirm"${value > 0 ? "" : " disabled"}>${esc(S("save"))}</button>`;
+       <button type="button" class="confirm" data-act="confirm"${value > 0 ? "" : " disabled"}>${esc(S("save"))}</button>
+       <div class="kbdhint">${esc(S("kbdPad"))}</div>`;
     return;
   }
 
@@ -385,7 +387,7 @@ function renderStaff() {
     screen.innerHTML =
       `<div class="apphead"><span class="who"><span class="brand">${esc(S("dayTitle"))}</span>
          <span class="date" style="display:block">${dmy(today())}</span></span>${langBar()}</div>
-       <div class="band">
+       <div class="band split">
          <div class="cell"><div class="owner-meta lab">${esc(S("dayCollected"))}</div>
            <div class="owner-total val paid">${rupees(collectedOn(data.entries, today()))}</div>
            <div class="owner-meta sub">${esc(S("dayCount")(paymentCount))} · ${esc(S("dayHandover"))}</div></div>
@@ -649,6 +651,48 @@ document.addEventListener("click", async (ev) => {
 
     case "togglearch": ui.showArchived = !ui.showArchived; ui.note = null; render(); return;
     case "opendetail": ui.shopId = el.dataset.shop; ui.note = null; ui.screen = "shopdetail"; render(); return;
+  }
+});
+
+/**
+ * Keyboard, for the laptop.
+ *
+ * It never replaces a tap target — every one of these has a button on screen,
+ * because the phone is still the main way in. It exists because entering a
+ * few hundred shops from the notebook with a mouse would be miserable, and
+ * because a staff member at a desk expects Enter to mean Enter.
+ */
+document.addEventListener("keydown", (ev) => {
+  if (ev.metaKey || ev.ctrlKey || ev.altKey) { return; }
+  const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName ?? "");
+  const digit = /^[0-9]$/.test(ev.key);
+
+  // sign in
+  if (!ui.user && ui.signin.userId) {
+    if (digit && ui.signin.pin.length < 6) { ui.signin.pin += ev.key; ui.signin.error = null; renderSignIn(); if (ui.signin.pin.length === 4) { trySignIn(); } ev.preventDefault(); return; }
+    if (ev.key === "Backspace") { ui.signin.pin = ui.signin.pin.slice(0, -1); renderSignIn(); ev.preventDefault(); return; }
+    if (ev.key === "Enter" && ui.signin.pin.length >= 4) { trySignIn(); ev.preventDefault(); return; }
+    if (ev.key === "Escape") { ui.signin.userId = null; ui.signin.error = null; renderSignIn(); return; }
+    return;
+  }
+  if (!ui.user) { return; }
+
+  // the amount pad
+  if (!isOwner() && ui.screen === "pad" && !typing) {
+    if (digit && ui.pad.length < 7) { ui.pad += ev.key; render(); ev.preventDefault(); return; }
+    if (ev.key === "Backspace") { ui.pad = ui.pad.slice(0, -1); render(); ev.preventDefault(); return; }
+    if (ev.key === "Enter") { document.querySelector('[data-act="confirm"]:not([disabled])')?.click(); ev.preventDefault(); return; }
+  }
+
+  // Enter saves a form the way a desk user expects
+  if (ev.key === "Enter" && typing && ui.screen === "shopform") {
+    document.querySelector('[data-act="saveshop"]')?.click();
+    ev.preventDefault();
+    return;
+  }
+
+  if (ev.key === "Escape" && !typing) {
+    document.querySelector('[data-act="home"]')?.click();
   }
 });
 

@@ -102,6 +102,21 @@ No billing, no GST invoices, no stock, no expiry, no schemes, no GPS, no vehicle
 
 And a harder line, in the code as well as the documentation: **there is no way to hide a transaction.** No second copy of an entry, no "exclude from reports" flag, no export that omits rows that exist in the database. Every report includes every shop that owes money, every export contains everything, and the printed sheet carries no GST number, no invoice number and no signature line — so it can never be mistaken for a bill. See `docs/BOUNDARIES.md`.
 
+## Phone and desktop
+
+The same app, one codebase, reflowing at 900px — not a stretched phone.
+
+On a laptop the work is a different job: a staff member sits down with the
+notebook and enters a few hundred shops, and the owner reads a longer list with
+more of it visible. So on a wide screen the tab bar becomes a sidebar, the two
+totals sit side by side, the number pad stops being the width of the window,
+and **the keyboard works**: type the PIN, type an amount and press Enter, Enter
+saves a shop form, Escape goes back. Every one of those still has a button on
+screen — the keyboard is an addition for the desk, never a requirement.
+
+The owner's screen keeps its rules at every width: one screen, no navigation,
+nothing that changes a balance.
+
 ## Installing it on a phone
 
 `client/manifest.webmanifest` and `client/sw.js` make it installable: open the

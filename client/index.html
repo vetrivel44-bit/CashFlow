@@ -223,6 +223,50 @@
 
   /* Printing takes the sheet and nothing else: black on white, rules only,
      never the Night theme — a dark-mode print is a black page. */
+  /* ---------------------------------------------------------------------
+     Wide screens.
+
+     Not a stretched phone. On a laptop the work is different: a staff member
+     sits down with the notebook and enters a few hundred shops with a
+     keyboard, and the owner reads a longer list with more of it visible at
+     once. Same components, same tokens — the layout reflows and the keyboard
+     starts working.
+     --------------------------------------------------------------------- */
+  @media (min-width: 900px) {
+    body{padding:0}
+    #root{max-width:1180px;flex-direction:row-reverse;height:100vh;background:var(--bg-page)}
+    #screen{padding:var(--space-8) var(--space-8) var(--space-8)}
+    #page{max-width:780px;margin:0 auto}
+
+    /* the tab bar becomes a sidebar */
+    #tabs{flex-direction:column;justify-content:flex-start;width:232px;border-top:0;
+          border-right:var(--border-hair) solid var(--rule-100);
+          padding:var(--space-8) 0;gap:var(--space-1)}
+    /* flex:1 is right for a bottom bar and wrong for a sidebar — without
+       this the three tabs spread over the whole height of the window. */
+    .tab{flex:none;justify-content:flex-start;padding:0 var(--space-6);min-height:56px;font-size:16px}
+    .tab[aria-pressed="true"]{box-shadow:inset 3px 0 0 var(--primary-600);background:var(--bg-muted)}
+
+    /* the two totals sit side by side instead of stacked */
+    .band.split{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-8)}
+    .band.split .cell+.cell{border-top:0;margin-top:0;padding-top:0;
+                            border-left:var(--border-hair) solid var(--rule-100);padding-left:var(--space-8)}
+
+    .actions .act{min-height:64px;font-size:17px}
+    /* a number pad the width of the screen is absurd on a desktop */
+    .keys,.confirm,.readout,.pindots{max-width:420px}
+    .field input{max-width:480px}
+    .stack{max-width:480px}
+    .row{min-height:64px}
+    .kbdhint{display:block}
+  }
+
+  @media (min-width: 1280px) {
+    #page{max-width:860px}
+  }
+
+  .kbdhint{display:none;color:var(--text-400);font-size:13px;line-height:19px;margin-top:var(--space-3)}
+
   @media print {
     #root,#tabs{display:none!important}
     #printarea{display:block!important}
@@ -236,7 +280,7 @@
 </head>
 <body>
 <div id="root">
-  <div id="screen"></div>
+  <div id="screen"><div id="page"></div></div>
   <div id="tabs"></div>
 </div>
 <div id="printarea"></div>
