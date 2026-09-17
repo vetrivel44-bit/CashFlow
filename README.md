@@ -12,11 +12,21 @@ This repository is the backend and the data layer. The interface is designed in 
 
 ```bash
 cp .env.example .env
-node scripts/add-user.js "Owner name" owner 4821
-node scripts/add-user.js "Delivery staff" staff 1177
-npm start          # http://localhost:8080
+npm run seed       # sample shops + two accounts, to see it working
+npm start          # the whole app: http://localhost:8080
 npm test           # 19 tests, no network needed
 ```
+
+Open it and sign in. `npm run seed` prints the two PINs — owner `4821`, staff `1177`.
+For a real setup, skip the seed and make the accounts yourself:
+
+```bash
+node scripts/add-user.js "Appa" owner 4821
+node scripts/add-user.js "Delivery staff" staff 1177
+```
+
+The server serves the app as well as the API, on one origin. There is no
+separate build step and no bundler: the browser loads the ES modules directly.
 
 **There are no npm dependencies.** Node 22.5+ ships SQLite (`node:sqlite`), an HTTP server, crypto, a test runner and zlib — everything this server needs. `npm install` does nothing, `node_modules` stays empty, and there is no dependency to patch at an awkward moment. The `.xlsx` writer is 120 lines in `server/src/xlsx.js` for the same reason.
 
@@ -92,9 +102,21 @@ No billing, no GST invoices, no stock, no expiry, no schemes, no GPS, no vehicle
 
 And a harder line, in the code as well as the documentation: **there is no way to hide a transaction.** No second copy of an entry, no "exclude from reports" flag, no export that omits rows that exist in the database. Every report includes every shop that owes money, every export contains everything, and the printed sheet carries no GST number, no invoice number and no signature line — so it can never be mistaken for a bill. See `docs/BOUNDARIES.md`.
 
+## Installing it on a phone
+
+`client/manifest.webmanifest` and `client/sw.js` make it installable: open the
+site in Chrome, *Add to home screen*, and it gets an icon and opens without
+browser chrome. The service worker caches the app shell so it still opens with
+no signal, and deliberately never caches an `/api/` response — the ledger lives
+in IndexedDB, and a stale cached response would be a second, older copy of the
+truth competing with it.
+
 ## Still to build
 
-- Wire the interface in the working model to `client/src/store.js`.
-- Tamil wording reviewed by someone who uses these words daily.
-- A scheduled nightly backup trigger on the owner's phone.
-- Deployment notes for the VPS (systemd unit, TLS, `data/` on a backed-up volume).
+- Tamil wording reviewed by someone who uses these words daily. What is there
+  is a first pass and should not go in front of a customer as it stands.
+- A nightly trigger for the Drive backup, and the screen that connects it.
+- Deployment: systemd unit, TLS, `data/` on a volume that gets backed up.
+- Pagination on `GET /api/sync?since=0`. A first sync after a few years of
+  entries will be one large response; it is fine for now and will not be
+  forever.

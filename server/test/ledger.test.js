@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   balanceOf, oldestUnpaidDate, daysOutstanding, collectedOn, deliveredOn,
   outstandingList, groupByShop, groupDigits, live
-} from "../src/ledger.js";
+} from "../../shared/ledger.js";
 
 let n = 0;
 const e = (kind, amount, date, extra = {}) => ({

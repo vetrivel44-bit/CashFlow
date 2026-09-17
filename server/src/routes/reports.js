@@ -1,4 +1,4 @@
-import { outstandingList, groupByShop, collectedOn, deliveredOn, balanceOf, daysOutstanding, live } from "../ledger.js";
+import { outstandingList, groupByShop, collectedOn, deliveredOn, balanceOf, daysOutstanding, live } from "../../../shared/ledger.js";
 import { buildXlsx, buildCsv } from "../xlsx.js";
 import { bad } from "../http.js";
 

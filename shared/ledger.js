@@ -1,5 +1,11 @@
 /**
- * Ledger arithmetic.
+ * Ledger arithmetic — shared, byte for byte, by the server and the phones.
+ *
+ * It lives in shared/ rather than being written twice because the phones
+ * compute these numbers offline and the server computes them for the printed
+ * sheet and the export. Two implementations of "what does this shop owe" would
+ * eventually disagree, and the first person to notice would be a distributor
+ * looking at two different totals for the same shop.
  *
  * Every number the app shows is derived here from the entry list. Nothing is
  * stored as a running total, so the owner's phone, the staff phone, the printed

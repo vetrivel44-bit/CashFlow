@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="CashFlow Ledger">
+  <rect width="192" height="192" rx="40" fill="#0f4c81"/>
+  <g fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" opacity="0.85">
+    <line x1="44" y1="66" x2="148" y2="66"/>
+    <line x1="44" y1="96" x2="148" y2="96"/>
+    <line x1="44" y1="126" x2="112" y2="126"/>
+  </g>
+  <rect x="120" y="112" width="28" height="28" rx="6" fill="#b42318"/>
+</svg>
