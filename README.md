@@ -1,137 +1,120 @@
-# CashFlow Ledger
+# CashFlow
 
-An outstanding-payment tracker for a wholesale FMCG distributor in Tamil Nadu. It answers one question — **who owes how much, and for how long** — and does nothing else.
+A cash flow decision-support app for an Indian small business. It answers one question:
 
-Two phones share one ledger. The owner's phone is one screen he reads and never types into. A staff phone records deliveries and payments and keeps the shop list. Both work with no signal.
+> **Will I have enough cash next month, and what should I do now?**
 
-This repository is the backend and the data layer. The interface is designed in a separate [design system](https://claude.ai/artifact/RfZ2gzHm7oRTNhqDdu7w6H) and previewed as a [working model](https://claude.ai/artifact/G3A6uCNPGLnCzyeTHKngpd).
+Forecasting, risk detection, invoice ageing, reminder drafting and a payment planner. It runs on the owner's own machine and explains itself in plain language using a local AI model — nothing leaves the laptop.
+
+> **Status: half built.** The domain logic, the server and the tests are done and passing. **There is no interface yet** — `npm start` serves the API, but the dashboard is not written, so opening `http://localhost:8080` in a browser gets a 404. See [Where this stands](#where-this-stands).
 
 ---
 
-## Running it
+## Running what exists
 
 ```bash
 cp .env.example .env
-npm run seed       # sample shops + two accounts, to see it working
-npm start          # the whole app: http://localhost:8080
-npm test           # 19 tests, no network needed
+npm run demo       # load the sample business
+npm start          # API on http://localhost:8080
+npm test           # 24 tests
 ```
 
-Open it and sign in. `npm run seed` prints the two PINs — owner `4821`, staff `1177`.
-For a real setup, skip the seed and make the accounts yourself:
+Needs **Node 22.5 or newer** — below that `node:sqlite` does not exist and nothing starts.
 
 ```bash
-node scripts/add-user.js "Appa" owner 4821
-node scripts/add-user.js "Delivery staff" staff 1177
+curl localhost:8080/api/dashboard | head -c 400
+curl -X POST localhost:8080/api/chat -H 'content-type: application/json' \
+     -d '{"question":"why am I at risk?"}'
 ```
 
-The server serves the app as well as the API, on one origin. There is no
-separate build step and no bundler: the browser loads the ES modules directly.
-
-**There are no npm dependencies.** Node 22.5+ ships SQLite (`node:sqlite`), an HTTP server, crypto, a test runner and zlib — everything this server needs. `npm install` does nothing, `node_modules` stays empty, and there is no dependency to patch at an awkward moment. The `.xlsx` writer is 120 lines in `server/src/xlsx.js` for the same reason.
-
-It runs on the cheapest VPS you can rent. One file (`data/cashflow.db`) is the whole database; copying it is a complete backup.
+**No npm dependencies.** Node ships SQLite, an HTTP server, crypto and a test runner; that is everything this needs. `npm install` does nothing, and there is no dependency to patch at an awkward moment. It runs on the cheapest VPS you can rent, and `data/cashflow.db` is the entire database.
 
 ## How it is put together
 
 ```
+shared/            the domain maths — imported by the server and, later, the browser
+  money.js         integer rupees, Indian grouping, Indian date parsing
+  forecast.js      90 days × 3 scenarios, recurring-cost detection
+  risk.js          RED / AMBER / GREEN, and the reasons behind it
+  invoices.js      ageing buckets, reminder drafting
+  optimizer.js     which payments may move, and which never may
 server/src/
-  schema.sql        the ledger: append-only entries, shops, routes, devices, audit
-  db.js             open, transactions, the change sequence
-  ledger.js         balance, ageing, the outstanding list  ← the business rules
-  auth.js           PIN login, device tokens, read-only owner
-  http.js           a ~100-line router over node:http
-  xlsx.js           a minimal .xlsx writer, and CSV with a BOM
-  routes/sync.js    pull/push between phones and server
-  routes/reports.js outstanding, print sheet, day close, shop ledger, exports
-client/src/
-  store.js          the phone's IndexedDB copy — the app's only data source
-  sync.js           the background push/pull loop
-  drive-backup.js   nightly backup to the owner's OWN Google Drive
+  schema.sql       records only — no derived value is ever stored
+  csv.js           imports that reject bad rows instead of guessing
+  analysis.js      one function producing every number on screen
+  chat.js          local model, with a written fallback
+  app.js           routes
 ```
 
-## The five decisions worth knowing
+## The six decisions worth knowing
 
-**1. Nothing is ever deleted.** There is no `DELETE` anywhere in this server. A wrong entry is *reversed*: the mistake keeps its row and gains a `reversed_by`, and a second row records the correction. Both are visible for ever. A shop that stops buying is *archived*, never removed.
+**1. Wages, tax and EMI are never moved.** The optimizer refuses those categories outright, *even when the data marks them shiftable*. Delaying wages is not a cash flow technique — people have rent of their own. A missed EMI reaches the credit bureau and costs the business its next loan. Statutory dates carry penalties. This is the one place the tool overrules its user, and it is deliberate.
 
-The one subtlety, and the bug the tests caught while this was written: a correction is **two** rows, and **neither** of them counts as money. Excluding only the reversed one cancels the mistake twice and moves the balance the wrong way. See `live()` in `server/src/ledger.js`.
+**2. The AI explains; it never calculates.** Every figure is computed in `shared/`. The model receives a small fact sheet — a few dozen already-computed numbers — and is told to answer only from it. It never sees the ledger and is never asked to add anything up. Language models are unreliable at arithmetic and reliable at rephrasing, so they get only the second job. With no model running, the answer is composed from the same facts in code; that path is *more* reliable, just less fluent.
 
-**2. No total is ever stored.** Balances, day counts and the outstanding list are computed from the entry table on every read. Two phones cannot disagree about a number that neither of them stores, and a report can never be stale.
+**3. Nothing derived is stored.** No cached forecast, no saved balance, no stored risk level. A stored forecast is wrong the moment a transaction lands, and two screens disagreeing about one number destroys trust in a single glance.
 
-**3. Payments settle the oldest delivery first.** That is how the trade settles, and it means a shop that pays part of an old bill gets credit for its age, while a shop that pays for this week's goods with last month's still unpaid does not get its day count reset.
+**4. Bad rows are rejected, never coerced.** Every skipped CSV row comes back with its line number and what was wrong with it. A silently misread amount is worse than a missing one, because the total still looks plausible. `03/04/2026` is read as 3 April and never guessed as 4 March.
 
-**4. Entries are immutable and carry a client-generated id.** So pushing the same batch twice is a no-op, a phone that loses signal mid-push can retry forever, and a payment can never be double-counted. This is what makes sync safe over a bad connection without a single conflict dialogue.
+**5. Whole rupees as integers.** Floats and money do not mix; ninety days of float addition drifts enough to turn an AMBER into a GREEN.
 
-**5. The owner's phone is read-only on the server.** Enforced in `requireStaff()`, not by hiding buttons. A role check on the server is the difference between a design decision and a guarantee.
+**6. Reminders are drafted, never sent.** The app writes the words and stops. An automatic reminder eventually goes to the customer who paid yesterday in cash, and that costs more than the invoice.
 
-## Offline, and what the network is for
+## How the forecast works
 
-The phone is the source of truth for what happened. Every screen reads IndexedDB and never the network, which is why the interface has no loading states and no offline banner — offline is the normal state of a phone in a delivery area, not a fault to report.
+Three sources, all visible in the output so any figure traces back to a row:
 
-`client/src/sync.js` pushes the outbox and pulls anything new whenever it can, with exponential backoff, and gives up quietly when it cannot. Pull is `GET /api/sync?since=N`, where N is a server-assigned sequence number, not a timestamp — two phones with wrong clocks still agree on the order the server accepted things in.
+1. **Outstanding invoices** → money in at `due_date + typical collection delay`, where the delay is the median of your own settled invoices. An already-overdue invoice is expected from *today*, not from a due date that has passed.
+2. **Scheduled payments** → money out on their date.
+3. **Recurring items found in history** → both directions. Three or more occurrences with a median gap of 25–35 days counts as monthly; anything less regular is left out rather than guessed at. This third source is what makes a forecast honest — a business that forgets its monthly standing costs forecasts a healthy month and then wonders where the cash went.
 
-## Backup goes to his Drive, not ours
+| Scenario | collections shift | share collected in 90 days | costs |
+| --- | --- | --- | --- |
+| Expected | — | 100% | as scheduled |
+| Optimistic | 7 days earlier | 100% | 3% lower |
+| Pessimistic | 21 days later | 80% | 10% higher |
 
-`client/src/drive-backup.js` uploads the whole ledger as plain JSON to the **owner's own Google Drive**, straight from his phone. The backup never passes through this server and this server never holds a Google credential. Scope is `drive.file`, which can only see files this app created — connecting the backup cannot read anything else in his Drive.
+Pessimistic is a normal bad quarter, not a doomsday.
 
-The printed sheet is still the backup he actually relies on. This one is for the day the phone is lost.
+**Risk** is RED when the expected case goes negative within 30 days; AMBER when it goes negative later, or survives only if collections hold, or leaves under 21 days of costs at the trough; GREEN otherwise. The thresholds are named constants in `shared/risk.js` — they are a judgement call and you should be able to disagree with them.
+
+**The optimizer** is greedy, and re-runs the whole forecast for each candidate move rather than estimating the effect — moving a payment past a second dip can make things worse, and only recomputation catches that. It stops as soon as the balance clears zero, so you get the smallest set of changes rather than a rescheduled quarter.
 
 ## API
 
-All endpoints need `Authorization: Bearer <token>` except the first three.
-
 | | |
 | --- | --- |
-| `GET /api/health` | liveness |
-| `GET /api/auth/users` | names and roles for the sign-in screen |
-| `POST /api/auth/login` | `{user_id, pin}` → device token |
-| `GET /api/sync?since=N` | everything written after N |
-| `POST /api/sync` | push routes, shops, entries, reversals (staff only) |
-| `GET /api/reports/outstanding` | who owes what, worst overdue first |
-| `GET /api/reports/print-sheet` | the same, plus today's collections |
-| `GET /api/reports/day-close` | the midnight handover figure |
-| `GET /api/shops/:id/ledger` | one shop's history with running balance |
-| `GET /api/export.xlsx` · `.csv` | for the accountant |
-| `GET /api/backup.json` | the whole ledger, for the Drive backup |
+| `GET /api/dashboard` | every number on the dashboard, from one analysis |
+| `GET /api/day/:date` | the events behind one day, so "why the dip here" has an answer |
+| `GET /api/invoices` | ageing buckets and rows |
+| `POST /api/invoices/:id/reminder` | drafts text; sends nothing |
+| `POST /api/import/transactions` · `/invoices` | CSV body; returns what imported and what was rejected, with line numbers |
+| `POST /api/demo` · `POST /api/reset` | load or clear the sample business |
+| `POST /api/chat` | `{question}` → answer plus the facts it was based on |
 
-Login is a **PIN**, not a password, because the owner does not type — 4 to 6 digits on the same number pad he uses for money. Short PINs are only safe if guessing is slow and bounded, so they are stretched with scrypt, failures lock the account for ten minutes, and a successful login issues a long random device token that is stored hashed.
+The chat returns its fact sheet alongside the answer, so the interface can show what the reply was based on. An explanation you cannot check is just a claim.
 
-## What this will never do
+## Local AI
 
-No billing, no GST invoices, no stock, no expiry, no schemes, no GPS, no vehicle management. Those are out of scope for this release.
+Install [Ollama](https://ollama.com), then `ollama pull llama3.2`. The app finds it on `127.0.0.1:11434`; set `OLLAMA_URL` / `OLLAMA_MODEL` to change that. If nothing is running, explanations are written from the same numbers instead — no error, no degraded-mode banner.
 
-And a harder line, in the code as well as the documentation: **there is no way to hide a transaction.** No second copy of an entry, no "exclude from reports" flag, no export that omits rows that exist in the database. Every report includes every shop that owes money, every export contains everything, and the printed sheet carries no GST number, no invoice number and no signature line — so it can never be mistaken for a bill. See `docs/BOUNDARIES.md`.
+## Where this stands
 
-## Phone and desktop
+**Done and tested:** money and date handling, the forecast and its three scenarios, recurring-cost detection, risk scoring with reasons, invoice ageing, reminder drafting, the payment optimizer with its refusals, CSV import for both file types, the analysis pipeline, the chat with both its local-model and written paths, the HTTP API, and the sample business. 24 tests cover the rules above.
 
-The same app, one codebase, reflowing at 900px — not a stretched phone.
+**Not built yet:**
 
-On a laptop the work is a different job: a staff member sits down with the
-notebook and enters a few hundred shops, and the owner reads a longer list with
-more of it visible. So on a wide screen the tab bar becomes a sidebar, the two
-totals sit side by side, the number pad stops being the width of the window,
-and **the keyboard works**: type the PIN, type an amount and press Enter, Enter
-saves a shop form, Escape goes back. Every one of those still has a button on
-screen — the keyboard is an addition for the desk, never a requirement.
+- **The dashboard.** There is no `client/` directory at all — this is the main gap. It needs the 90-day chart, the risk card, the ageing table with reminder buttons, the payment plan, the upload panel and the chat, working at both desktop and phone width.
+- The scenario chart palette was mid-validation for colourblind separation when work stopped. Red against green fails deuteranopia badly, so the hues need choosing with a validator rather than by eye.
+- API-level tests. The 24 cover `shared/` and the CSV importer, not the routes.
+- No authentication. Fine for one machine on a desk; not fine on a public address.
 
-The owner's screen keeps its rules at every width: one screen, no navigation,
-nothing that changes a balance.
+## Out of scope
 
-## Installing it on a phone
+No bank connection, no payment execution, no GST filing, no accounting ledger, no multi-currency.
 
-`client/manifest.webmanifest` and `client/sw.js` make it installable: open the
-site in Chrome, *Add to home screen*, and it gets an icon and opens without
-browser chrome. The service worker caches the app shell so it still opens with
-no signal, and deliberately never caches an `/api/` response — the ledger lives
-in IndexedDB, and a stale cached response would be a second, older copy of the
-truth competing with it.
+And a harder line: **nothing here may hide a transaction.** No second copy of a row, no "exclude from reports" flag, no export that omits what the screen shows.
 
-## Still to build
+## History
 
-- Tamil wording reviewed by someone who uses these words daily. What is there
-  is a first pass and should not go in front of a customer as it stands.
-- A nightly trigger for the Drive backup, and the screen that connects it.
-- Deployment: systemd unit, TLS, `data/` on a volume that gets backed up.
-- Pagination on `GET /api/sync?since=0`. A first sync after a few years of
-  entries will be one large response; it is fine for now and will not be
-  forever.
+Commits before `28a63f2` are a different application — an offline-first outstanding-payment tracker for an FMCG distributor, with its own client, sync layer and tests. It was replaced rather than extended, and remains in the history if it is ever wanted.

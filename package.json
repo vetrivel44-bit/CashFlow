@@ -1,13 +1,13 @@
 {
-  "name": "cashflow-ledger",
-  "version": "0.1.0",
+  "name": "cashflow",
+  "version": "0.2.0",
   "private": true,
-  "description": "Outstanding-payment tracker for a wholesale FMCG distributor. Offline-first, no npm dependencies.",
+  "description": "Cash flow forecasting, risk detection and payment planning for a small business. Runs locally, with local AI explanations.",
   "type": "module",
   "engines": { "node": ">=22.5" },
   "scripts": {
     "start": "node server/src/index.js",
-    "seed": "node server/src/seed.js",
+    "demo": "node server/src/demo.js",
     "test": "node --test server/test/*.test.js"
   }
 }

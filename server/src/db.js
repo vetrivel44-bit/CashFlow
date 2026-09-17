@@ -12,38 +12,28 @@ export function openDb(path) {
   return db;
 }
 
-/**
- * Take the next change sequence number.
- *
- * Every write stamps its row with one of these. A client pulls with
- * `?since=N` and gets exactly the rows it has not seen, in write order.
- * Sequence numbers rather than timestamps: two phones with wrong clocks
- * still agree on the order the server accepted things in.
- */
-export function nextSeq(db) {
-  db.prepare("UPDATE change_seq SET val = val + 1 WHERE id = 1").run();
-  return db.prepare("SELECT val FROM change_seq WHERE id = 1").get().val;
+export function getSetting(db, key, fallback = null) {
+  const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(key);
+  return row ? row.value : fallback;
 }
 
-export function currentSeq(db) {
-  return db.prepare("SELECT val FROM change_seq WHERE id = 1").get().val;
+export function setSetting(db, key, value) {
+  db.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    .run(key, String(value));
 }
 
-export function audit(db, { userId = "", deviceId = "", action, detail = "" }) {
-  db.prepare(
-    "INSERT INTO audit (at, user_id, device_id, action, detail) VALUES (?, ?, ?, ?, ?)"
-  ).run(Date.now(), userId, deviceId, action, typeof detail === "string" ? detail : JSON.stringify(detail));
-}
-
-/** Run fn inside a transaction, rolling back if it throws. */
 export function tx(db, fn) {
   db.exec("BEGIN IMMEDIATE");
-  try {
-    const out = fn();
-    db.exec("COMMIT");
-    return out;
-  } catch (err) {
-    try { db.exec("ROLLBACK"); } catch { /* already rolled back */ }
-    throw err;
-  }
+  try { const out = fn(); db.exec("COMMIT"); return out; }
+  catch (err) { try { db.exec("ROLLBACK"); } catch { /* already rolled back */ } throw err; }
+}
+
+/** Everything the analysis needs, in one read. */
+export function loadAll(db) {
+  return {
+    openingBalance: Number(getSetting(db, "opening_balance", "0")),
+    transactions: db.prepare("SELECT * FROM transactions ORDER BY date").all(),
+    invoices: db.prepare("SELECT * FROM invoices ORDER BY due_date").all(),
+    scheduled: db.prepare("SELECT * FROM scheduled_payments ORDER BY due_date").all()
+  };
 }
